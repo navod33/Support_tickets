@@ -13,9 +13,19 @@ class TicketController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        $tickets = Ticket::paginate($request->query('per_page', 10));
+
+        return view('tickets.index', [
+            'tickets' => $tickets,
+        ]);
+
+        $tickets = Ticket::all();
+
+        return view('tickets.index', [
+            'tickets' => $tickets,
+        ]);
     }
 
     /**
