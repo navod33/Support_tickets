@@ -17,11 +17,38 @@ class TicketController extends Controller
     {
         $tickets = Ticket::paginate($request->query('per_page', 10));
 
-        return view('tickets.index', [
-            'tickets' => $tickets,
-        ]);
+        // return view('tickets.index', [
+        //     'tickets' => $tickets,
+        // ]);
 
-        $tickets = Ticket::all();
+
+        ///////////////////////////
+        $ticketsQuery = Ticket::query();
+
+        $q = $request->query('q');
+        $sortColumn = $request->query('sort', 'created_at');
+        $sortDir = $request->query('sort_dir') == 'asc' ? 'asc' : 'desc';
+        $sorttableColumns = [
+            'customer_name',
+            'created_at',
+            'updated_at',
+            'status',
+        ];
+
+        // Searching__
+        if ($q) {
+            $ticketsQuery->where('ref', 'LIKE', "%$q%")
+                ->orWhere('customer_name', 'LIKE', "%$q%")
+                ->orWhere('phone', 'LIKE', "%$q%")
+                ->orWhere('description', 'LIKE', "%$q%");
+        }
+
+        //Sorting.
+        if (in_array($sortColumn, $sorttableColumns)) {
+            $ticketsQuery->orderBy($sortColumn, $sortDir);
+        }
+
+        $tickets = $ticketsQuery->paginate($request->query('per_page', 10));
 
         return view('tickets.index', [
             'tickets' => $tickets,
@@ -62,6 +89,12 @@ class TicketController extends Controller
         $ticket->status = 0;
 
         if ($ticket->save()) {
+            //Mail::to($ticket->email)->send(new \App\Mail\TicketCreated($ticket));
+            // dispatch the TicketCreated event
+            //\App\Events\TicketCreated::dispatch($ticket);
+
+            //Send the email to customer
+            Mail::to($ticket->email)->send(new \App\Mail\TicketCreated($ticket));
             return redirect(route('tickets.show', $ticket->id))
                 ->with('success', 'Your ticket is created successfully. Please write down the reference number to check the ticket status later.');
         }
@@ -70,12 +103,14 @@ class TicketController extends Controller
 
 
         if ($ticket->save()) {
-            // Send the email to customer
-            Mail::to($ticket->email)->send(new \App\Mail\TicketCreated($ticket));
+            // dispatch the TicketCreated event
+            \App\Events\TicketCreated::dispatch($ticket);
 
             return redirect(route('tickets.show', $ticket->id))
                 ->with('success', 'Your ticket is created successfully. Please write down the reference number to check the ticket status later.');
         }
+
+        return redirect()->back()->with('error', 'Oops! Could not create your ticket. Please try later.');
     }
 
     /**
